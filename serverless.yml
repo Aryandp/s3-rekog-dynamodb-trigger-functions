@@ -1,0 +1,58 @@
+service: serverless-s3-rekog-dynamodb
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: ap-south-1
+  environment:
+    NODE_ENV: dev
+    BUCKET_NAME: serverless-s3-functions-bucket
+    DYNAMODB_TABLE_NAME: serverless-s3-functions-face-dynamodb-table
+    REKOG_COLLECTION_NAME: face-recognition-collection
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - "rekognition:IndexFaces"
+        - "rekognition:ListFaces"
+        - "rekognition:SearchFaces"
+        - "rekognition:SearchFacesByImage"
+        - "s3:GetObject"
+        - "s3:PutObject"
+        - "dynamodb:PutItem"
+        - "dynamodb:GetItem"
+        - "dynamodb:Query"
+        - "dynamodb:BatchWriteItem"
+      Resource:
+        - "arn:aws:s3:::serverless-s3-functions-bucket/*" # S3 bucket
+        - "arn:aws:dynamodb:ap-south-1:*:table/serverless-s3-functions-face-dynamodb-table" # DynamoDB table
+        - "arn:aws:rekognition:ap-south-1:*:collection/serverless-s3-functions-face-collection" # Rekognition collection
+
+functions:
+  s3UploadTrigger:
+    handler: app.handler
+    events:
+      - s3:
+          bucket: serverless-s3-functions-bucket # Referencing the existing bucket
+          event: s3:ObjectCreated:* # Trigger on new object uploads
+          existing: true # Indicates the bucket is pre-existing and should not be created
+
+resources:
+  Resources:
+    FacesDynamoDBTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: serverless-s3-functions-face-dynamodb-table
+        AttributeDefinitions:
+          - AttributeName: FaceId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: FaceId
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+
+plugins:
+  - serverless-offline
+  - serverless-dotenv-plugin
+custom:
+  serverless-offline:
+    httpPort: 5000
